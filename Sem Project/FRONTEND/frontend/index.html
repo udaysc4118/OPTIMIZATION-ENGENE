@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MahaRoute Workspace</title>
+    <!-- Leaflet & Routing Machine -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    
+    <!-- Premium Aesthetics -->
+    <link rel="stylesheet" href="assets/css/global.css">
+    <link rel="stylesheet" href="assets/css/app.css">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="workspace-layout">
+        
+        <!-- Sidebar Command Center -->
+        <aside class="workspace-sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                     <i class="ri-route-line" style="color:var(--brand-primary)"></i> MahaRoute <span style="font-weight:300;">Pro</span>
+                </div>
+                <div class="user-pill" id="userPill" style="display:none;">
+                    <span id="userNameDisplay">User</span>
+                    <button id="logoutBtn" title="Secure Logout"><i class="ri-logout-box-r-line"></i></button>
+                </div>
+            </div>
+
+            <div class="sidebar-content">
+                <h3 style="font-size:24px; margin-bottom:5px; font-family:'Outfit'; color:#fff; font-weight:800; letter-spacing:-0.5px;">Mission Control</h3>
+                <p style="font-size:14px; color:var(--text-muted); margin-bottom:30px;">Coordinate dynamic waypoints to compile optimized routing matrices.</p>
+                
+                <div class="control-box glass-panel">
+                    
+                    <label style="font-size:12px; font-weight:800; color:var(--text-muted); margin-bottom:12px; display:block; text-transform:uppercase; letter-spacing:1px;">City Waypoints</label>
+                    <div id="inputs" style="display:flex; flex-direction:column; gap:12px; margin-bottom:25px;">
+                        <!-- JS injected cities go here -->
+                    </div>
+                    
+                    <button class="btn btn-secondary action-btn" onclick="addCity()" style="width:100%; margin-bottom: 35px; border-style: dashed;">
+                        <i class="ri-add-line"></i> Add City Hub
+                    </button>
+
+                    <div class="input-group">
+                        <label>Select Deployment Base</label>
+                        <select id="start" class="premium-select">
+                            <option value="">Select departure origin</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Select Extraction Point</label>
+                        <select id="end" class="premium-select">
+                            <option value="">Select terminating hub</option>
+                        </select>
+                    </div>
+
+                    <div id="errorDisplay" style="color:#fca5a5; font-size:14px; margin-bottom:15px; text-align:center; font-weight:500;"></div>
+
+                    <button class="btn btn-primary action-btn-glow" onclick="run()" style="width:100%; margin-top:15px; font-size:16px;">
+                        <i class="ri-rocket-line"></i> Optimize Route Sequence
+                    </button>
+                    <button class="btn btn-secondary action-btn" onclick="clearMap()" style="width:100%; margin-top:15px;">
+                        <i class="ri-refresh-line"></i> Purge Active Logic
+                    </button>
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+               <a href="admin.html" id="adminLink" style="display:none; color:var(--text-muted); font-size:13px; font-weight:600; text-decoration:none; transition: color 0.3s;"><i class="ri-settings-4-line"></i> Administrator Gateway</a>
+               <p style="font-size: 11px; color:var(--text-muted); opacity: 0.5; margin-top:10px;"><i class="ri-lock-2-line"></i> Encrypted Session</p>
+            </div>
+        </aside>
+
+        <!-- Main Map Area -->
+        <main class="workspace-map">
+            <div id="map"></div>
+        </main>
+    </div>
+
+    <!-- 1. ANALYSIS SPLIT SECTION: ROUTE STRUCTURE (Left) & BREAKDOWN (Right) -->
+    <section class="analysis-split-section" id="analysisSplit" style="display:none; padding:100px 40px; background:radial-gradient(ellipse at top right, #101625, var(--bg-dark)); border-top:1px solid rgba(255,255,255,0.05);">
+        <div style="max-width:1450px; margin:0 auto;" class="analysis-split-layout">
+            
+            <!-- LEFT: Route Structure -->
+            <div class="structure-side">
+                <h2 class="section-heading"><i class="ri-git-merge-line" style="color:var(--brand-secondary)"></i> Route Structure</h2>
+                <p class="section-subheading" style="margin-bottom:40px; max-width:100%;">Architectural pathway topologies mapped for precise visualization.</p>
+                
+                <div id="svgContainer" style="display: flex; flex-direction: column; gap: 40px; padding-right: 40px;">
+                    
+                    <!-- 1. GREEDY PATH -->
+                    <div class="svg-block card-hover" style="border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.03); padding: 35px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-weight:800; color:#10b981; font-size:18px; letter-spacing:0.5px;">1. Fastest Path Logic</span>
+                            <span class="badge badge-fast" style="font-size:13px; padding:6px 14px;">⚡ Greedy Route</span>
+                        </div>
+                        <div style="margin-top:20px; background:rgba(0,0,0,0.5); border-radius:18px; padding:25px; text-align:center; border: 1px solid rgba(16,185,129,0.1);">
+                            <svg id="graphGreedy" width="100%" height="auto" style="display:block; min-height: 280px;">
+                                <defs><marker id="arrowGreedy" markerWidth="10" markerHeight="10" refX="28" refY="4" orient="auto"><polyline points="0,0 6,4 0,8" fill="none" stroke="#10b981" stroke-width="2"/></marker></defs>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 2. TOTAL PATH (BASE SEQUENCE) -->
+                    <div class="svg-block card-hover" style="border-color: rgba(148,163,184,0.3); background: rgba(148,163,184,0.03); padding: 35px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-weight:800; color:#94a3b8; font-size:18px; letter-spacing:0.5px;">2. Original Flow Layout</span>
+                            <span class="badge badge-normal" style="font-size:13px; padding:6px 14px;">Base Sequence</span>
+                        </div>
+                        <div style="margin-top:20px; background:rgba(0,0,0,0.5); border-radius:18px; padding:25px; text-align:center; border: 1px solid rgba(148,163,184,0.1);">
+                            <svg id="graphTotal" width="100%" height="auto" style="display:block; min-height: 280px;">
+                                <defs><marker id="arrowTotal" markerWidth="10" markerHeight="10" refX="28" refY="4" orient="auto"><polyline points="0,0 6,4 0,8" fill="none" stroke="#94a3b8" stroke-width="2"/></marker></defs>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 3. OPTIMAL PATH -->
+                    <div class="svg-block block-optimal card-hover" style="border-color: rgba(251,146,60,0.3); background: rgba(251,146,60,0.06); padding: 35px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-weight:800; color:#fb923c; font-size:18px; letter-spacing:0.5px;">3. Recommended Baseline</span>
+                            <span class="badge badge-optimal" style="font-size:13px; padding:6px 14px;">⭐ Optimal Matrix</span>
+                        </div>
+                        <div style="margin-top:20px; background:rgba(0,0,0,0.5); border-radius:18px; padding:25px; text-align:center; border: 1px solid rgba(251,146,60,0.1);">
+                            <svg id="graphOptimal" width="100%" height="auto" style="display:block; min-height: 280px;">
+                                <defs><marker id="arrowOptimal" markerWidth="10" markerHeight="10" refX="28" refY="4" orient="auto"><polyline points="0,0 6,4 0,8" fill="none" stroke="#fb923c" stroke-width="2"/></marker></defs>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 4. FINAL MASTER STRUCTURE -->
+                    <div class="svg-block block-final card-hover" style="position:relative; overflow:hidden; border: 2px solid rgba(59, 130, 246, 0.6); background: linear-gradient(135deg, rgba(8, 14, 25, 1) 0%, rgba(18, 32, 60, 0.4) 100%); padding: 50px; transform: scale(1.03); box-shadow: 0 40px 80px rgba(0,0,0,0.9), 0 0 40px rgba(59,130,246,0.15); margin-top:40px; border-radius: 24px;">
+                        
+                        <!-- Decorative Glare Element for Premium Feel -->
+                        <div style="position:absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(105deg, transparent 20%, rgba(255,255,255,0.03) 25%, transparent 30%); pointer-events:none;"></div>
+                        
+                        <div style="display:flex; justify-content:space-between; align-items:center; position:relative; z-index:2;">
+                            <span style="font-weight:900; color:#60a5fa; font-size:24px; letter-spacing:1.5px; text-transform:uppercase; text-shadow: 0 2px 10px rgba(0,0,0,0.5);">4. Final Master Structure</span>
+                            <span class="badge" style="background: linear-gradient(to right, #2563eb, #3b82f6); color:#fff; border:none; padding:10px 22px; font-size:13px; box-shadow: 0 10px 20px rgba(37, 99, 235, 0.4); text-shadow: 0 1px 2px rgba(0,0,0,0.4);">🏆 Confirmed Setup</span>
+                        </div>
+                        <div style="margin-top:35px; background:rgba(0,0,0,0.6); border-radius:20px; padding:45px; text-align:center; border: 1px solid rgba(59,130,246,0.3); position:relative; z-index:2; backdrop-filter: blur(10px);">
+                            <svg id="graphFinal" width="100%" height="auto" style="display:block; min-height: 380px;">
+                                <defs><marker id="arrowFinal" markerWidth="10" markerHeight="10" refX="28" refY="4" orient="auto"><polyline points="0,0 6,4 0,8" fill="none" stroke="#60a5fa" stroke-width="2"/></marker></defs>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: Live Logistics Breakdown -->
+            <div class="breakdown-side" style="margin-top:0;">
+                <h2 class="section-heading" style="color:#fff;">
+                    <i class="ri-article-line" style="color:var(--brand-primary)"></i> Logistics Breakdown
+                </h2>
+                <p class="section-subheading" style="margin-bottom:40px; max-width:100%;">Compact, segment-by-segment intelligence mapping for the selected physical route.</p>
+                
+                <div id="breakdownContainer">
+                    <!-- Javascript will inject high-fidelity compact cards here -->
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- 2. ADVANCED ANALYTICS OVERVIEW -->
+    <section class="analytics-section" id="analyticsHUD" style="display:none; padding:120px 40px; background: #060911; border-top: 1px solid rgba(255,255,255,0.03); min-height: 50vh; position:relative;">
+        <div style="position:absolute; top:0; left:0; width:100%; height:1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);"></div>
+        
+        <div style="max-width: 1450px; margin: 0 auto;">
+             <h2 class="section-heading"><i class="ri-dashboard-3-line" style="color:var(--brand-primary)"></i> Advanced Mission Telemetry</h2>
+             <p class="section-subheading">A global data perspective factoring straight-line bounds and computational matrix efficiency.</p>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 40px; margin-top:50px;">
+                <div id="prediction" class="analytics-card card-hover" style="height:100%;"></div>
+                <div id="compare" class="analytics-card card-hover" style="font-size:14px; height:100%;"></div>
+                
+                <div id="matrix-container" class="analytics-card card-hover" style="grid-column: 1 / -1; overflow-x:auto;">
+                    <h3 style="font-size:18px; margin-bottom:25px; color:#e2e8f0; font-family:'Outfit'; display:flex; gap:10px; align-items:center;">
+                        <i class="ri-grid-fill" style="color:var(--brand-secondary)"></i> Baseline Distance Matrix Computation (km)
+                    </h3>
+                    <div id="matrix" style="width:100%;"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+    <script src="assets/js/app.js"></script>
+</body>
+</html>

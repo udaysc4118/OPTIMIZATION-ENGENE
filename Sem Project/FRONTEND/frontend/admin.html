@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MahaRoute AI — Command Center</title>
+    <!-- Premium Aesthetics -->
+    <link rel="stylesheet" href="assets/css/global.css">
+    <link rel="stylesheet" href="assets/css/admin.css">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    
+    <div class="command-center" id="commandCenter" style="display:none;">
+        
+        <nav class="cc-sidebar">
+            <div class="logo" style="margin-bottom: 50px;">
+                <i class="ri-route-line" style="color:var(--brand-primary)"></i> MahaRoute <span style="font-weight:300;">Admin</span>
+            </div>
+            <ul class="cc-menu">
+                <li class="active"><i class="ri-dashboard-line"></i> Main Intelligence</li>
+                <li onclick="window.location='index.html'"><i class="ri-map-pin-line"></i> Return to Map</li>
+            </ul>
+            <button class="logout-btn" id="logoutBtn"><i class="ri-logout-box-r-line"></i> Secure Logout</button>
+        </nav>
+        
+        <main class="cc-main">
+            <!-- HEADER -->
+            <header class="cc-header">
+                <div>
+                    <h1>System Telemetry</h1>
+                    <p style="color:var(--text-muted);">Real-time monitoring of all secure network operators.</p>
+                </div>
+                <div style="display:flex; gap:15px; align-items:center;">
+                    <div style="text-align:right; font-size:12px; color:var(--text-muted);">
+                        SERVER STATUS<br><span style="color:#10b981; font-weight:800;">ONLINE SECURE</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- STAT CARDS -->
+            <div class="dashboard-stats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px; margin-bottom: 40px;">
+                
+                <div class="stat-card glass-panel card-hover" style="padding: 25px; display:flex; align-items:center; gap:20px;">
+                    <div style="width:50px; height:50px; border-radius:12px; background:rgba(59,130,246,0.1); color:#3b82f6; display:flex; align-items:center; justify-content:center; font-size:24px;">
+                        <i class="ri-group-line"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:13px; color:var(--text-muted); font-weight:700; letter-spacing:1px; text-transform:uppercase;">Total Operators</div>
+                        <div class="val" id="totalUsersCount" style="font-size:32px; font-weight:800; font-family:'Outfit';">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card glass-panel card-hover" style="padding: 25px; display:flex; align-items:center; gap:20px;">
+                    <div style="width:50px; height:50px; border-radius:12px; background:rgba(16,185,129,0.1); color:#10b981; display:flex; align-items:center; justify-content:center; font-size:24px;">
+                        <i class="ri-user-follow-line"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:13px; color:var(--text-muted); font-weight:700; letter-spacing:1px; text-transform:uppercase;">Active Fleet</div>
+                        <div class="val" id="activeUsersCount" style="font-size:32px; font-weight:800; font-family:'Outfit';">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card glass-panel card-hover" style="padding: 25px; display:flex; align-items:center; gap:20px;">
+                    <div style="width:50px; height:50px; border-radius:12px; background:rgba(2fb960,0.1); color:#fb923c; display:flex; align-items:center; justify-content:center; font-size:24px;">
+                        <i class="ri-pulse-line"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:13px; color:var(--text-muted); font-weight:700; letter-spacing:1px; text-transform:uppercase;">New Logins (24h)</div>
+                        <div class="val" id="recentLoginsCount" style="font-size:32px; font-weight:800; font-family:'Outfit';">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card glass-panel card-hover" style="padding: 25px; display:flex; align-items:center; gap:20px;">
+                    <div style="width:50px; height:50px; border-radius:12px; background:rgba(239,68,68,0.1); color:#ef4444; display:flex; align-items:center; justify-content:center; font-size:24px;">
+                        <i class="ri-shield-user-line"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:13px; color:var(--text-muted); font-weight:700; letter-spacing:1px; text-transform:uppercase;">Suspended</div>
+                        <div class="val" id="suspendedUsersCount" style="font-size:32px; font-weight:800; font-family:'Outfit';">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CHART ROW -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 25px; margin-bottom: 40px;">
+                <div class="glass-panel" style="padding: 30px;">
+                    <h2 style="font-size:18px; color:#fff; margin-bottom:20px; display:flex; justify-content:space-between;">
+                        <span><i class="ri-line-chart-line" style="color:var(--brand-secondary);"></i> Registration Matrix</span>
+                    </h2>
+                    <div style="height: 300px; width:100%;">
+                        <canvas id="growthChart"></canvas>
+                    </div>
+                </div>
+                <!-- SIDEBAR QUICK ACTIONS -->
+                <div class="glass-panel" style="padding: 30px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+                    <i class="ri-checkbox-circle-fill" style="font-size:64px; color:#10b981; margin-bottom:15px; opacity:0.8;"></i>
+                    <h2 style="font-size:22px; color:#fff;">System Stable</h2>
+                    <p style="color:var(--text-muted); font-size:14px; margin-bottom:25px;">All routing nodes and operator credentials are encrypted and functioning normally.</p>
+                </div>
+            </div>
+
+            <!-- TABLE CONTAINER -->
+            <div class="table-container glass-panel" style="padding:30px;">
+                <div class="toolbar" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
+                    <h2 style="font-size: 20px;"><i class="ri-folder-user-line"></i> Operator Directory</h2>
+                    <div class="input-group" style="margin:0; width: 350px; position:relative;">
+                         <i class="ri-search-line" style="position:absolute; left:15px; top:50%; transform:translateY(-50%); color:var(--text-muted);"></i>
+                         <input type="text" id="userSearch" placeholder="Search by name, email, or ID..." style="padding:12px 14px 12px 40px; background:rgba(0,0,0,0.5); border-radius:10px;">
+                    </div>
+                </div>
+                
+                <!-- Dynamic Data Table -->
+                <div style="overflow-x:auto;">
+                    <table class="cc-table" style="width:100%; text-align:left; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                <th style="padding:15px; color:var(--text-muted); font-size:12px; font-weight:800; letter-spacing:1px;">IDENTIFIER</th>
+                                <th style="padding:15px; color:var(--text-muted); font-size:12px; font-weight:800; letter-spacing:1px;">NAME</th>
+                                <th style="padding:15px; color:var(--text-muted); font-size:12px; font-weight:800; letter-spacing:1px;">SECURE EMAIL</th>
+                                <th style="padding:15px; color:var(--text-muted); font-size:12px; font-weight:800; letter-spacing:1px;">LAST LOGIN</th>
+                                <th style="padding:15px; color:var(--text-muted); font-size:12px; font-weight:800; letter-spacing:1px;">STATUS</th>
+                                <th style="padding:15px; color:var(--text-muted); font-size:12px; font-weight:800; letter-spacing:1px; text-align:right;">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <!-- Populated by admin.js -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div class="modal-overlay" id="editModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; justify-content:center; align-items:center; backdrop-filter:blur(5px);">
+        <div class="modal-box glass-panel" style="width: 450px; padding: 40px;">
+            <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
+                <h2 style="font-size:24px;">Modify Operative</h2>
+                <button class="close-btn" id="closeEditModal" style="background:none; border:none; color:#fff; font-size:24px; cursor:pointer;"><i class="ri-close-line"></i></button>
+            </div>
+            <form id="editForm">
+                <input type="hidden" id="editUserId">
+                <div class="input-group">
+                    <label>Full Name</label>
+                    <input type="text" id="editName" required>
+                </div>
+                <div class="input-group">
+                    <label>Email Address</label>
+                    <input type="email" id="editEmail" required>
+                </div>
+                <div style="display:flex; gap:15px; margin-top:35px;">
+                    <button type="submit" class="btn btn-primary" style="flex:1;"><i class="ri-save-line"></i> Save Changes</button>
+                    <button type="button" class="btn btn-secondary" id="cancelEditBtn" style="flex:1;">Cancel</button>
+                </div>
+                <p id="editMsg" class="error-badge" style="display:none; margin-top:20px;"></p>
+            </form>
+        </div>
+    </div>
+
+    <script src="assets/js/admin.js?v=20260325"></script>
+</body>
+</html>

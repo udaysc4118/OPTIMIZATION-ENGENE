@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MahaRoute — Secure Access</title>
+  <link rel="stylesheet" href="assets/css/global.css">
+  <link rel="stylesheet" href="assets/css/login.css">
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+</head>
+<body>
+
+  <div class="split-screen">
+      <!-- Left Sidebar (Forms) -->
+      <div class="auth-sidebar">
+          <div class="auth-logo">
+              <i class="ri-route-line" style="color:var(--brand-primary)"></i> MahaRoute <span style="font-weight:300;">Pro</span>
+          </div>
+
+          <!-- SIGNUP PANEL -->
+          <div class="auth-panel" id="signupPanel">
+              <div id="signupStep1">
+                  <div class="auth-header">
+                      <h1>Start your journey</h1>
+                      <p>Optimize your logistics operations effortlessly.</p>
+                  </div>
+                  <div class="input-group">
+                      <label>Full Name</label>
+                      <input id="su_name" type="text" placeholder="Jane Doe">
+                  </div>
+                  <div class="input-group">
+                      <label>Email Address</label>
+                      <input id="su_email" type="email" placeholder="jane@example.com">
+                  </div>
+                  <div class="input-group">
+                      <label>Password</label>
+                      <input id="su_pass" type="password" placeholder="••••••••">
+                  </div>
+                  <button class="btn btn-primary" id="submitSignup" style="width: 100%; margin-top:10px;">Create Account <i class="ri-arrow-right-line"></i></button>
+                  <p id="signupErr" class="error-badge" style="display:none;"></p>
+                  
+                  <div class="toggle-mode">
+                      Already have an account? <a href="#" id="openLogin">Sign in securely</a>
+                  </div>
+              </div>
+
+              <div id="signupStep2" style="display:none;">
+                  <div class="auth-header">
+                      <h1>Check your email</h1>
+                      <p>We've sent a secure 6-digit confirmation code to your inbox.</p>
+                  </div>
+                  <div class="input-group">
+                      <label>Verification Code</label>
+                      <input id="su_otp" type="text" placeholder="123456" maxlength="6" style="font-size:28px; text-align:center; letter-spacing:12px; font-weight:800; padding:20px;">
+                  </div>
+                  <button class="btn btn-primary" id="verifyOtpBtn" style="width: 100%; margin-bottom: 20px;">Verify & Access</button>
+                  <button class="btn btn-secondary" id="resendOtpBtn" style="width: 100%;">Resend Code</button>
+                  <div style="text-align:center; margin-top:30px;">
+                      <a href="#" id="backToSignup" style="font-size:14px; color:var(--text-muted); text-decoration:none; font-weight:600;"><i class="ri-arrow-left-line"></i> Use a different email</a>
+                  </div>
+                  <p id="otpErr" class="error-badge" style="display:none;"></p>
+                  <p id="otpSuccess" class="success-badge" style="display:none;"></p>
+              </div>
+          </div>
+
+          <!-- LOGIN PANEL -->
+          <div class="auth-panel active" id="loginPanel">
+              <div class="auth-header">
+                  <h1>Welcome back</h1>
+                  <p>Log in to access your elite routing intelligence.</p>
+              </div>
+              <div class="input-group">
+                  <label>Email Address</label>
+                  <input id="li_email" type="text" placeholder="jane@example.com">
+              </div>
+              <div class="input-group">
+                  <label>Password</label>
+                  <input id="li_pass" type="password" placeholder="••••••••">
+              </div>
+              <button class="btn btn-primary" id="submitLogin" style="width: 100%; margin-top:10px;">Sign In <i class="ri-login-box-line"></i></button>
+              <p id="loginErr" class="error-badge" style="display:none;"></p>
+              
+              <div class="toggle-mode" style="margin-top: 20px;">
+                  Don't have an account? <a href="#" id="openSignup">Create one now</a>
+              </div>
+              <div class="toggle-mode" style="margin-top:15px; border-top:1px solid rgba(255,255,255,0.05); padding-top:15px;">
+                  Authorized Personnel? <a href="#" id="openAdminLogin" style="color:#60a5fa; font-weight:700;"><i class="ri-shield-keyhole-line"></i> Admin Gateway</a>
+              </div>
+          </div>
+
+          <!-- ADMIN LOGIN PANEL -->
+          <div class="auth-panel" id="adminPanel">
+              <div class="auth-header">
+                  <h1 style="color:#60a5fa;">Command Center</h1>
+                  <p>Secure administrator authentication gateway.</p>
+              </div>
+              <form id="adminForm">
+                  <div class="input-group">
+                      <label>Admin Username / Email</label>
+                      <input id="admin_email" type="text" placeholder="admin" required style="position:relative; z-index:50;">
+                  </div>
+                  <div class="input-group">
+                      <label>Secure Passkey</label>
+                      <input id="admin_pass" type="password" placeholder="••••••••" required style="position:relative; z-index:50;">
+                  </div>
+                  <button type="submit" class="btn btn-primary" id="submitAdminLogin" style="width: 100%; margin-top:10px; background: linear-gradient(135deg, #2563eb, #3b82f6); box-shadow: 0 8px 25px rgba(37,99,235,0.4); position:relative; z-index:50;">Verify Clearance <i class="ri-shield-check-line"></i></button>
+              </form>
+              <p id="adminErr" class="error-badge" style="display:none;"></p>
+              
+              <div class="toggle-mode" style="margin-top:25px;">
+                  Standard Operative? <a href="#" id="backToUserLogin" style="color:var(--text-muted);"><i class="ri-arrow-left-line"></i> Return to User Login</a>
+              </div>
+          </div>
+      </div>
+
+      <!-- Right Sidebar (Visual completely visible without crop) -->
+      <div class="visual-sidebar">
+          <div class="visual-card">
+              <img src="banner/big2.jpg" alt="Visualization" class="featured-img" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1594938291221-94f18cbb5660?q=80&w=1000&auto=format&fit=crop';">
+              <div class="visual-content-new">
+                  <h2><span class="text-gradient">Intelligent</span> Routing</h2>
+                  <p>Experience the ultimate logistics planning platform. Designed for uncompromising professional precision.</p>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <script src="assets/js/auth.js?v=20260325"></script>
+</body>
+</html>
