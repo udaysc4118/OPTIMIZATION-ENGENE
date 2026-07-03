@@ -1,0 +1,12 @@
+{
+  "users": [],
+  "otps": [],
+  "admins": [
+    {
+      "id": "admin-uuid-1",
+      "admin_id": "admin@maharoute.ai",
+      "password_hash": "$2b$10$U6Uj1G8F/f3xN2j791mGvea1Kk5tP34U67/wQn6zTz/z6wS1Q11qG"
+    }
+  ],
+  "messages": []
+}

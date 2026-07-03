@@ -1,6 +1,14 @@
 // frontend/assets/js/admin.js
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = (() => {
+    if (window.location.protocol === 'file:') return 'http://localhost:5000/api';
+    const host = window.location.hostname;
+    const port = window.location.port;
+    if ((host === 'localhost' || host === '127.0.0.1') && port && port !== '5000') {
+        return `http://${host}:5000/api`;
+    }
+    return `${window.location.origin}/api`;
+})();
 
 const token = localStorage.getItem("mfp_token");
 const userStr = localStorage.getItem("mfp_user");
@@ -181,6 +189,7 @@ function renderTable() {
             <td style="padding:15px; text-align:right;">
                 <button class="action-btn" style="background:transparent; border:none; color:${toggleColor}; font-size:18px; cursor:pointer; margin-right:15px; transition:all 0.3s;" title="${toggleTitle}" onclick="toggleUserStatus('${u.id}', ${!isActive})"><i class="${toggleIcon}"></i></button>
                 <button class="action-btn" style="background:transparent; border:none; color:#60a5fa; font-size:18px; cursor:pointer; margin-right:15px; transition:all 0.3s;" title="Modify Details" onclick="openEditModal('${u.id}')"><i class="ri-edit-2-line"></i></button>
+                <button class="action-btn" style="background:transparent; border:none; color:var(--brand-secondary); font-size:18px; cursor:pointer; margin-right:15px; transition:all 0.3s;" title="Toggle AI Access" onclick="toggleAiAccessFromUsers('${u.id}')"><i class="ri-robot-2-line"></i></button>
                 <button class="action-btn" style="background:transparent; border:none; color:#ef4444; font-size:18px; cursor:pointer; transition:all 0.3s;" title="Purge Record" onclick="deleteUser('${u.id}')"><i class="ri-delete-bin-7-line"></i></button>
             </td>
         `;
@@ -188,6 +197,46 @@ function renderTable() {
     });
 
     updatePaginationUI(maxPages);
+}
+
+async function toggleAiAccessFromUsers(userId) {
+    const u = allUsers.find(x => x.id === userId);
+    const name = u?.name || userId;
+
+    try {
+        const permRes = await fetch(`${API_URL}/ai/permissions/${userId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        const permData = await permRes.json().catch(() => ({}));
+        if (!permRes.ok) {
+            alert(permData.error || 'Failed to load AI permission');
+            return;
+        }
+
+        const nextAllowed = !permData.allowed;
+        const res = await fetch(`${API_URL}/admin/ai-permissions/${userId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ allowed: nextAllowed })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            alert(data.error || 'Failed to update AI access');
+            return;
+        }
+
+        if (selectedChatUserId === userId) {
+            selectedUserAiAllowed = nextAllowed;
+            fetchAiAccessForSelectedUser();
+        }
+
+        alert(`AI access ${nextAllowed ? 'enabled' : 'disabled'} for ${name}`);
+    } catch (e) {
+        alert('Failed to update AI access');
+    }
 }
 
 function updatePaginationUI(maxPages) {
@@ -479,3 +528,351 @@ window.deleteUser = async function(id) {
         alert("Server error connecting to database.");
     }
 }
+
+let chatUsers = [];
+let selectedChatUserId = null;
+let selectedChatUserName = '';
+let selectedUserAiAllowed = false;
+let chatUsersTimer = null;
+let chatMessagesTimer = null;
+let adminHeartbeatTimer = null;
+
+function formatChatTime(value) {
+    if (!value) return '';
+    return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderChatUserList() {
+    const listEl = document.getElementById('chatUserList');
+    if (!listEl) return;
+
+    if (!chatUsers.length) {
+        listEl.innerHTML = '<div class="admin-chat-empty">No chats yet.</div>';
+        return;
+    }
+
+    listEl.innerHTML = '';
+    chatUsers.forEach((user) => {
+        const item = document.createElement('div');
+        item.className = `chat-user-item ${selectedChatUserId === user.user_id ? 'active' : ''}`;
+        const unreadBadge = user.unread > 0 ? `<span class="chat-unread">${user.unread}</span>` : '';
+        item.innerHTML = `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <div class="chat-user-name">${user.user_name || 'User'}</div>
+                ${unreadBadge}
+            </div>
+            <div class="chat-user-meta">${user.user_email || ''}</div>
+        `;
+        item.onclick = () => selectChatUser(user.user_id, user.user_name || 'User');
+        listEl.appendChild(item);
+    });
+}
+
+async function fetchChatUsers() {
+    try {
+        const res = await fetch(`${API_URL}/admin/chat/users`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        chatUsers = data.users || [];
+        renderChatUserList();
+    } catch {
+        // silent in dashboard loop
+    }
+}
+
+function renderAdminMessages(messages) {
+    const msgEl = document.getElementById('adminChatMessages');
+    if (!msgEl) return;
+
+    msgEl.innerHTML = '';
+    if (!messages || messages.length === 0) {
+        msgEl.innerHTML = '<div class="admin-chat-empty">No messages in this conversation.</div>';
+        return;
+    }
+
+    messages.forEach((msg) => {
+        const box = document.createElement('div');
+        box.className = `admin-chat-msg ${msg.sender_type === 'user' ? 'user' : 'admin'}`;
+        box.innerHTML = `${msg.message}<div class="admin-chat-time">${formatChatTime(msg.created_at)}</div>`;
+        msgEl.appendChild(box);
+    });
+
+    msgEl.scrollTop = msgEl.scrollHeight;
+}
+
+async function fetchChatMessages() {
+    if (!selectedChatUserId) return;
+    try {
+        const res = await fetch(`${API_URL}/admin/chat/messages/${selectedChatUserId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        renderAdminMessages(data.messages || []);
+        fetchChatUsers();
+    } catch {
+        // silent in polling
+    }
+}
+
+function selectChatUser(userId, userName) {
+    selectedChatUserId = userId;
+    selectedChatUserName = userName;
+    const selectedEl = document.getElementById('selectedChatUser');
+    if (selectedEl) selectedEl.textContent = `Chat with ${userName}`;
+    
+    // Show delete button when a user is selected
+    const deleteBtn = document.getElementById('deleteChatBtn');
+    if (deleteBtn) deleteBtn.style.display = 'block';
+    const aiBtn = document.getElementById('toggleAiAccessBtn');
+    if (aiBtn) aiBtn.style.display = 'block';
+    fetchAiAccessForSelectedUser();
+    
+    renderChatUserList();
+    fetchChatMessages();
+}
+
+async function fetchAiAccessForSelectedUser() {
+    if (!selectedChatUserId) return;
+    const aiBtn = document.getElementById('toggleAiAccessBtn');
+    if (!aiBtn) return;
+
+    aiBtn.disabled = true;
+    try {
+        const res = await fetch(`${API_URL}/ai/permissions/${selectedChatUserId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to load AI permission');
+        const data = await res.json();
+        selectedUserAiAllowed = !!data.allowed;
+        aiBtn.innerHTML = selectedUserAiAllowed
+            ? '<i class="ri-lock-unlock-line"></i> Disable AI'
+            : '<i class="ri-robot-2-line"></i> Enable AI';
+        aiBtn.className = selectedUserAiAllowed ? 'btn btn-danger' : 'btn btn-secondary';
+    } catch {
+        aiBtn.innerHTML = '<i class="ri-error-warning-line"></i> AI Access';
+        aiBtn.className = 'btn btn-secondary';
+    } finally {
+        aiBtn.disabled = false;
+    }
+}
+
+async function toggleAiAccessForSelectedUser() {
+    if (!selectedChatUserId) {
+        alert('Select a user first.');
+        return;
+    }
+
+    const aiBtn = document.getElementById('toggleAiAccessBtn');
+    if (aiBtn) aiBtn.disabled = true;
+    try {
+        const nextAllowed = !selectedUserAiAllowed;
+        const res = await fetch(`${API_URL}/admin/ai-permissions/${selectedChatUserId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ allowed: nextAllowed })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            alert(data.error || 'Failed to update AI access');
+            return;
+        }
+        selectedUserAiAllowed = nextAllowed;
+        fetchAiAccessForSelectedUser();
+        alert(`AI access ${nextAllowed ? 'enabled' : 'disabled'} for ${selectedChatUserName}`);
+    } catch {
+        alert('Failed to update AI access');
+    } finally {
+        if (aiBtn) aiBtn.disabled = false;
+    }
+}
+
+async function deleteUserChat() {
+    if (!selectedChatUserId) {
+        alert('Select a user first.');
+        return;
+    }
+
+    if (!confirm(`Delete all messages with ${selectedChatUserName}? This cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_URL}/admin/chat/delete/${selectedChatUserId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!res.ok) {
+            const data = await res.json();
+            alert(data.error || 'Failed to delete chat');
+            return;
+        }
+
+        alert('Chat deleted successfully.');
+        selectedChatUserId = null;
+        selectedChatUserName = null;
+        const selectedEl = document.getElementById('selectedChatUser');
+        if (selectedEl) selectedEl.textContent = 'Select a user to reply';
+        const deleteBtn = document.getElementById('deleteChatBtn');
+        if (deleteBtn) deleteBtn.style.display = 'none';
+        
+        const msgEl = document.getElementById('adminChatMessages');
+        if (msgEl) msgEl.innerHTML = '<div class="admin-chat-empty">Select a user from the left panel to view conversation.</div>';
+        
+        fetchChatUsers();
+    } catch (err) {
+        alert('Error deleting chat');
+    }
+}
+
+async function sendAdminHeartbeat() {
+    try {
+        await fetch(`${API_URL}/admin/chat/heartbeat`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        const presenceEl = document.getElementById('adminPresenceLabel');
+        if (presenceEl) {
+            presenceEl.textContent = 'ONLINE';
+            presenceEl.style.color = '#10b981';
+        }
+    } catch {
+        const presenceEl = document.getElementById('adminPresenceLabel');
+        if (presenceEl) {
+            presenceEl.textContent = 'DISCONNECTED';
+            presenceEl.style.color = '#ef4444';
+        }
+    }
+}
+
+const adminReplyForm = document.getElementById('adminReplyForm');
+if (adminReplyForm) {
+    adminReplyForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!selectedChatUserId) {
+            alert('Select a user first.');
+            return;
+        }
+
+        const input = document.getElementById('adminReplyInput');
+        const message = (input.value || '').trim();
+        if (!message) return;
+
+        const submitBtn = adminReplyForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+
+        try {
+            const res = await fetch(`${API_URL}/admin/chat/reply`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ userId: selectedChatUserId, message })
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                alert(data.error || 'Failed to send reply');
+                submitBtn.disabled = false;
+                return;
+            }
+
+            input.value = '';
+            fetchChatMessages();
+        } catch {
+            alert('Failed to send reply');
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
+}
+
+const deleteChatBtn = document.getElementById('deleteChatBtn');
+if (deleteChatBtn) {
+    deleteChatBtn.addEventListener('click', deleteUserChat);
+}
+
+const toggleAiAccessBtn = document.getElementById('toggleAiAccessBtn');
+if (toggleAiAccessBtn) {
+    toggleAiAccessBtn.addEventListener('click', toggleAiAccessForSelectedUser);
+}
+
+const openAdminAiBtn = document.getElementById('openAdminAiBtn');
+const closeAdminAiBtn = document.getElementById('closeAdminAiBtn');
+const adminAiPanel = document.getElementById('adminAiPanel');
+const adminAiForm = document.getElementById('adminAiForm');
+
+if (openAdminAiBtn && adminAiPanel) {
+    openAdminAiBtn.addEventListener('click', () => {
+        adminAiPanel.style.display = adminAiPanel.style.display === 'none' ? 'block' : 'none';
+        const input = document.getElementById('adminAiInput');
+        if (adminAiPanel.style.display !== 'none' && input) input.focus();
+    });
+}
+
+if (closeAdminAiBtn && adminAiPanel) {
+    closeAdminAiBtn.addEventListener('click', () => {
+        adminAiPanel.style.display = 'none';
+    });
+}
+
+if (adminAiForm) {
+    adminAiForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('adminAiInput');
+        const answerEl = document.getElementById('adminAiAnswer');
+        const sendBtn = document.getElementById('adminAiSendBtn');
+        const query = (input?.value || '').trim();
+        if (!query) return;
+
+        if (sendBtn) sendBtn.disabled = true;
+        if (answerEl) answerEl.textContent = 'Thinking...';
+
+        try {
+            const res = await fetch(`${API_URL}/admin/ai/query`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ query })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                if (answerEl) answerEl.textContent = data.error || 'AI query failed';
+                return;
+            }
+            if (answerEl) answerEl.textContent = data.answer || 'No response';
+            if (input) input.value = '';
+        } catch {
+            if (answerEl) answerEl.textContent = 'AI query failed';
+        } finally {
+            if (sendBtn) sendBtn.disabled = false;
+        }
+    });
+}
+
+function initAdminChat() {
+    const listEl = document.getElementById('chatUserList');
+    if (!listEl || !token) return;
+
+    fetchChatUsers();
+    sendAdminHeartbeat();
+
+    if (chatUsersTimer) clearInterval(chatUsersTimer);
+    if (chatMessagesTimer) clearInterval(chatMessagesTimer);
+    if (adminHeartbeatTimer) clearInterval(adminHeartbeatTimer);
+
+    chatUsersTimer = setInterval(fetchChatUsers, 5000);
+    chatMessagesTimer = setInterval(fetchChatMessages, 3000);
+    adminHeartbeatTimer = setInterval(sendAdminHeartbeat, 20000);
+}
+
+initAdminChat();

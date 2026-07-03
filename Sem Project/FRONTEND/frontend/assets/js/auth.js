@@ -1,21 +1,41 @@
 // frontend/assets/js/auth.js
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = (() => {
+    // Works for http(s) served pages, Live Server, and file:// opening
+    if (window.location.protocol === 'file:') return 'http://localhost:5000/api';
+
+    const host = window.location.hostname;
+    const port = window.location.port;
+
+    // If frontend is on localhost but different port (e.g., Live Server 5500), assume backend is 5000
+    if ((host === 'localhost' || host === '127.0.0.1') && port && port !== '5000') {
+        return `http://${host}:5000/api`;
+    }
+
+    return `${window.location.origin}/api`;
+})();
 
 const signupPanel = document.getElementById("signupPanel");
 const loginPanel = document.getElementById("loginPanel");
 
 const adminPanel = document.getElementById("adminPanel");
+const forgotPanel = document.getElementById("forgotPanel");
+const resetPanel = document.getElementById("resetPanel");
 
 const openLogin = document.getElementById("openLogin");
 const openSignup = document.getElementById("openSignup");
 const openAdminLogin = document.getElementById("openAdminLogin");
 const backToUserLogin = document.getElementById("backToUserLogin");
+const openForgotPass = document.getElementById("openForgotPass");
+const backToLoginFromForgot = document.getElementById("backToLoginFromForgot");
+const backToLoginFromReset = document.getElementById("backToLoginFromReset");
 
 function switchPanel(panel) {
     signupPanel.classList.remove('active');
     loginPanel.classList.remove('active');
     if (adminPanel) adminPanel.classList.remove('active');
+    if (forgotPanel) forgotPanel.classList.remove('active');
+    if (resetPanel) resetPanel.classList.remove('active');
     panel.classList.add('active');
 }
 
@@ -33,6 +53,24 @@ if (openAdminLogin) openAdminLogin.onclick = (e) => {
 if (backToUserLogin) backToUserLogin.onclick = (e) => { 
     e.preventDefault(); 
     switchPanel(loginPanel); 
+};
+
+if (openForgotPass) openForgotPass.onclick = (e) => {
+    e.preventDefault();
+    document.getElementById("forgotErr").style.display = "none";
+    document.getElementById("forgotSuccess").style.display = "none";
+    document.getElementById("fp_email").value = "";
+    switchPanel(forgotPanel);
+};
+
+if (backToLoginFromForgot) backToLoginFromForgot.onclick = (e) => {
+    e.preventDefault();
+    switchPanel(loginPanel);
+};
+
+if (backToLoginFromReset) backToLoginFromReset.onclick = (e) => {
+    e.preventDefault();
+    switchPanel(loginPanel);
 };
 
 function validateEmail(mail){ return /\S+@\S+\.\S+/.test(mail); }
@@ -273,6 +311,171 @@ if (adminForm) {
             err.style.display="block";
             submitAdminLogin.disabled = false;
             submitAdminLogin.innerHTML = "Verify Clearance <i class='ri-shield-check-line'></i>";
+        }
+    };
+}
+
+// ========================
+// FORGOT PASSWORD HANDLERS
+// ========================
+
+let forgotEmail = '';
+
+// Step 1: Send reset code
+const submitForgotPass = document.getElementById("submitForgotPass");
+if (submitForgotPass) {
+    submitForgotPass.onclick = async () => {
+        let email = document.getElementById("fp_email").value.trim().toLowerCase();
+        let err = document.getElementById("forgotErr");
+        let success = document.getElementById("forgotSuccess");
+
+        err.style.display = "none";
+        success.style.display = "none";
+
+        if (!email) { err.textContent = "Please enter your email"; err.style.display = "block"; return; }
+        if (!validateEmail(email)) { err.textContent = "Invalid email format"; err.style.display = "block"; return; }
+
+        submitForgotPass.disabled = true;
+        submitForgotPass.innerHTML = "Sending... <i class='ri-loader-4-line ri-spin'></i>";
+
+        try {
+            let res = await fetch(`${API_URL}/auth/forgot-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+            let data = await res.json();
+
+            if (!res.ok) {
+                err.textContent = data.error || "Failed to send reset code";
+                err.style.display = "block";
+                submitForgotPass.disabled = false;
+                submitForgotPass.innerHTML = "Send Reset Code <i class='ri-mail-send-line'></i>";
+                return;
+            }
+
+            forgotEmail = email;
+
+            // Switch to reset panel (Step 2)
+            document.getElementById("resetErr").style.display = "none";
+            document.getElementById("resetSuccess").style.display = "none";
+            document.getElementById("rp_otp").value = "";
+            document.getElementById("rp_newpass").value = "";
+            document.getElementById("rp_confirmpass").value = "";
+
+            let resetSuccess = document.getElementById("resetSuccess");
+            resetSuccess.textContent = data.message;
+            resetSuccess.style.display = "block";
+            setTimeout(() => { resetSuccess.style.display = "none"; }, 6000);
+
+            switchPanel(resetPanel);
+
+            submitForgotPass.disabled = false;
+            submitForgotPass.innerHTML = "Send Reset Code <i class='ri-mail-send-line'></i>";
+        } catch (e) {
+            err.textContent = "Server connection error";
+            err.style.display = "block";
+            submitForgotPass.disabled = false;
+            submitForgotPass.innerHTML = "Send Reset Code <i class='ri-mail-send-line'></i>";
+        }
+    };
+}
+
+// Step 2: Verify OTP and set new password
+const submitResetPass = document.getElementById("submitResetPass");
+if (submitResetPass) {
+    submitResetPass.onclick = async () => {
+        let otp = document.getElementById("rp_otp").value.trim();
+        let newPassword = document.getElementById("rp_newpass").value;
+        let confirmPass = document.getElementById("rp_confirmpass").value;
+        let err = document.getElementById("resetErr");
+        let success = document.getElementById("resetSuccess");
+
+        err.style.display = "none";
+        success.style.display = "none";
+
+        if (!otp) { err.textContent = "Enter the 6-digit code"; err.style.display = "block"; return; }
+        if (!newPassword) { err.textContent = "Enter new password"; err.style.display = "block"; return; }
+        if (newPassword.length < 6) { err.textContent = "Password must be at least 6 characters"; err.style.display = "block"; return; }
+        if (newPassword !== confirmPass) { err.textContent = "Passwords do not match"; err.style.display = "block"; return; }
+
+        submitResetPass.disabled = true;
+        submitResetPass.innerHTML = "Resetting... <i class='ri-loader-4-line ri-spin'></i>";
+
+        try {
+            let res = await fetch(`${API_URL}/auth/reset-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: forgotEmail, otp, newPassword })
+            });
+            let data = await res.json();
+
+            if (!res.ok) {
+                err.textContent = data.error || "Reset failed";
+                err.style.display = "block";
+                submitResetPass.disabled = false;
+                submitResetPass.innerHTML = "Reset Password <i class='ri-lock-password-line'></i>";
+                return;
+            }
+
+            success.textContent = data.message;
+            success.style.display = "block";
+
+            submitResetPass.disabled = false;
+            submitResetPass.innerHTML = "Reset Password <i class='ri-lock-password-line'></i>";
+
+            // Auto redirect to login after 2.5 seconds
+            setTimeout(() => {
+                switchPanel(loginPanel);
+            }, 2500);
+
+        } catch (e) {
+            err.textContent = "Server connection error";
+            err.style.display = "block";
+            submitResetPass.disabled = false;
+            submitResetPass.innerHTML = "Reset Password <i class='ri-lock-password-line'></i>";
+        }
+    };
+}
+
+// Resend reset OTP
+const resendResetOtp = document.getElementById("resendResetOtp");
+if (resendResetOtp) {
+    resendResetOtp.onclick = async () => {
+        let err = document.getElementById("resetErr");
+        let success = document.getElementById("resetSuccess");
+        err.style.display = "none";
+        success.style.display = "none";
+
+        if (!forgotEmail) { err.textContent = "Session expired. Go back and try again."; err.style.display = "block"; return; }
+
+        resendResetOtp.disabled = true;
+        resendResetOtp.textContent = "Sending...";
+
+        try {
+            let res = await fetch(`${API_URL}/auth/forgot-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: forgotEmail })
+            });
+            let data = await res.json();
+
+            if (!res.ok) {
+                err.textContent = data.error || "Failed to resend";
+                err.style.display = "block";
+            } else {
+                success.textContent = "New reset code sent to your email!";
+                success.style.display = "block";
+                setTimeout(() => { success.style.display = "none"; }, 4000);
+            }
+
+            resendResetOtp.disabled = false;
+            resendResetOtp.textContent = "Resend Code";
+        } catch (e) {
+            err.textContent = "Server connection error";
+            err.style.display = "block";
+            resendResetOtp.disabled = false;
+            resendResetOtp.textContent = "Resend Code";
         }
     };
 }
