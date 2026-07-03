@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "Sem Project/FRONTEND/backend/server.js",
+      "src": "server.js",
       "use": "@vercel/node"
     },
     {
@@ -13,7 +13,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/Sem%20Project/FRONTEND/backend/server.js"
+      "dest": "/server.js"
     },
     {
       "src": "/assets/(.*)",

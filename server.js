@@ -1,3 +1,3 @@
 const path = require('path');
 
-require(path.join(__dirname, 'Sem Project', 'FRONTEND', 'backend', 'server.js'));
+module.exports = require(path.join(__dirname, 'Sem Project', 'FRONTEND', 'backend', 'server.js'));
