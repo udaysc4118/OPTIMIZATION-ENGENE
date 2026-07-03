@@ -251,6 +251,16 @@ const ADMIN_ONLINE_TIMEOUT_MS = 70000;
 const AUTO_WAITING_MESSAGE = 'Admin is currently offline. Please wait, your message has been received and you will get a reply shortly.';
 let adminLastSeenAt = 0;
 
+function isBcryptHash(value) {
+    return typeof value === 'string' && (value.startsWith('$2a$') || value.startsWith('$2b$') || value.startsWith('$2y$'));
+}
+
+async function comparePasswordCompat(plain, stored) {
+    if (!plain || typeof plain !== 'string' || !stored || typeof stored !== 'string') return false;
+    if (isBcryptHash(stored)) return bcrypt.compare(plain, stored);
+    return plain === stored;
+}
+
 // Simple file-based AI permissions store (userId -> boolean)
 function ensureAiPermissionsFile() {
     seedRuntimeFile(
@@ -450,11 +460,22 @@ app.post('/api/auth/signup-verify', async (req, res) => {
         const password_hash = await bcrypt.hash(password, 10);
 
         // Insert into public.users beautifully completely independent of Supabase Auth limits
-        const { data: newUser, error: insertError } = await supabase
+        let { data: newUser, error: insertError } = await supabase
             .from('users')
             .insert([{ name, email, password_hash }])
             .select()
             .single();
+
+        // Backward compatibility for schemas using `password` column instead of `password_hash`
+        if (insertError && String(insertError.message || '').toLowerCase().includes('password_hash')) {
+            const fallback = await supabase
+                .from('users')
+                .insert([{ name, email, password: password_hash }])
+                .select()
+                .single();
+            newUser = fallback.data;
+            insertError = fallback.error;
+        }
 
         if (insertError) {
              if (insertError.code === '23505') return res.status(400).json({ error: 'User already exists!' });
@@ -478,22 +499,40 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
         if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+        const normalizedEmail = String(email).trim().toLowerCase();
 
         const { data: user, error } = await supabase
             .from('users')
             .select('*')
-            .eq('email', email)
+            .eq('email', normalizedEmail)
             .single();
 
         if (error || !user) return res.status(400).json({ error: 'Invalid credentials' });
         if (user.is_active === false) return res.status(403).json({ error: 'Account deactivated by an administrator.' });
 
-        if (!user.password_hash || typeof user.password_hash !== 'string') {
+        const storedPrimary = typeof user.password_hash === 'string' ? user.password_hash : null;
+        const storedLegacy = typeof user.password === 'string' ? user.password : null;
+
+        let match = false;
+        if (storedPrimary) {
+            match = await comparePasswordCompat(password, storedPrimary);
+        } else if (storedLegacy) {
+            match = await comparePasswordCompat(password, storedLegacy);
+        } else {
             return res.status(400).json({ error: 'Account is not ready for password login. Please reset password or sign up again.' });
         }
 
-        const match = await bcrypt.compare(password, user.password_hash);
         if (!match) return res.status(400).json({ error: 'Invalid credentials' });
+
+        // If legacy schema/password is used, migrate best-effort to password_hash for future logins.
+        if (!storedPrimary) {
+            try {
+                const migratedHash = await bcrypt.hash(password, 10);
+                await supabase.from('users').update({ password_hash: migratedHash }).eq('id', user.id);
+            } catch (e) {
+                // ignore migration failure; login already succeeded
+            }
+        }
 
         // Update last login telemetry
         await supabase.from('users').update({ last_login_at: new Date().toISOString() }).eq('id', user.id);
@@ -603,10 +642,18 @@ app.post('/api/auth/reset-password', async (req, res) => {
         const password_hash = await bcrypt.hash(newPassword, 10);
 
         // Update user password
-        const { error: updateError } = await supabase
+        let { error: updateError } = await supabase
             .from('users')
             .update({ password_hash })
             .eq('email', email.toLowerCase());
+
+        if (updateError && String(updateError.message || '').toLowerCase().includes('password_hash')) {
+            const fallback = await supabase
+                .from('users')
+                .update({ password: password_hash })
+                .eq('email', email.toLowerCase());
+            updateError = fallback.error;
+        }
 
         if (updateError) throw updateError;
 
@@ -637,16 +684,21 @@ app.post('/api/admin/login', async (req, res) => {
 
         if (error || !admin) return res.status(400).json({ error: 'Invalid Admin credentials' });
 
-        if (!admin.password_hash || typeof admin.password_hash !== 'string') {
-            return res.status(400).json({ error: 'Admin account password is not configured correctly.' });
-        }
+        const adminStoredPrimary = typeof admin.password_hash === 'string' ? admin.password_hash : null;
+        const adminStoredLegacy = typeof admin.password === 'string' ? admin.password : null;
 
         let match = false;
-        if (admin.password_hash.startsWith('$2a$') || admin.password_hash.startsWith('$2b$')) {
-            match = await bcrypt.compare(password, admin.password_hash);
+        if (adminStoredPrimary) {
+            if (isBcryptHash(adminStoredPrimary)) {
+                match = await bcrypt.compare(password, adminStoredPrimary);
+            } else {
+                const { data: pgcryptRes } = await supabase.rpc('check_admin_pass', { a_id: admin_id, a_pass: password });
+                match = pgcryptRes;
+            }
+        } else if (adminStoredLegacy) {
+            match = await comparePasswordCompat(password, adminStoredLegacy);
         } else {
-             const { data: pgcryptRes } = await supabase.rpc('check_admin_pass', { a_id: admin_id, a_pass: password });
-             match = pgcryptRes;
+            return res.status(400).json({ error: 'Admin account password is not configured correctly.' });
         }
 
         if (!match) return res.status(400).json({ error: 'Invalid Admin credentials' });
