@@ -488,6 +488,10 @@ app.post('/api/auth/login', async (req, res) => {
         if (error || !user) return res.status(400).json({ error: 'Invalid credentials' });
         if (user.is_active === false) return res.status(403).json({ error: 'Account deactivated by an administrator.' });
 
+        if (!user.password_hash || typeof user.password_hash !== 'string') {
+            return res.status(400).json({ error: 'Account is not ready for password login. Please reset password or sign up again.' });
+        }
+
         const match = await bcrypt.compare(password, user.password_hash);
         if (!match) return res.status(400).json({ error: 'Invalid credentials' });
 
@@ -632,6 +636,10 @@ app.post('/api/admin/login', async (req, res) => {
             .single();
 
         if (error || !admin) return res.status(400).json({ error: 'Invalid Admin credentials' });
+
+        if (!admin.password_hash || typeof admin.password_hash !== 'string') {
+            return res.status(400).json({ error: 'Admin account password is not configured correctly.' });
+        }
 
         let match = false;
         if (admin.password_hash.startsWith('$2a$') || admin.password_hash.startsWith('$2b$')) {
