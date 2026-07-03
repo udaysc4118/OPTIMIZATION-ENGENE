@@ -3,7 +3,12 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
-const bcrypt = require('bcrypt');
+let bcrypt;
+try {
+    bcrypt = require('bcrypt');
+} catch (e) {
+    bcrypt = require('bcryptjs');
+}
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
