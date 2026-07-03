@@ -246,7 +246,7 @@ function createLocalSupabaseMock() {
     };
 }
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'default_secret_key_for_jwt_12345';
 const ADMIN_ONLINE_TIMEOUT_MS = 70000;
 const AUTO_WAITING_MESSAGE = 'Admin is currently offline. Please wait, your message has been received and you will get a reply shortly.';
 let adminLastSeenAt = 0;
