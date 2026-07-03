@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "Sem Project/FRONTEND/backend/server.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "Sem Project/FRONTEND/frontend/**/*",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/Sem%20Project/FRONTEND/backend/server.js"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/Sem%20Project/FRONTEND/frontend/assets/$1"
+    },
+    {
+      "src": "/banner/(.*)",
+      "dest": "/Sem%20Project/FRONTEND/frontend/banner/$1"
+    },
+    {
+      "src": "/admin.html",
+      "dest": "/Sem%20Project/FRONTEND/frontend/admin.html"
+    },
+    {
+      "src": "/login.html",
+      "dest": "/Sem%20Project/FRONTEND/frontend/login.html"
+    },
+    {
+      "src": "/",
+      "dest": "/Sem%20Project/FRONTEND/frontend/login.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/Sem%20Project/FRONTEND/frontend/$1"
+    }
+  ]
+}

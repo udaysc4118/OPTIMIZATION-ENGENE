@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -30,9 +31,28 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 let supabase;
 
+const isVercelRuntime = Boolean(process.env.VERCEL);
+const runtimeDataDir = isVercelRuntime ? path.join('/tmp', 'maharoute-data') : __dirname;
+const DB_FILE = path.join(runtimeDataDir, 'local_db.json');
+const AI_PERMISSIONS_PATH = path.join(runtimeDataDir, 'ai_permissions.json');
+
+function ensureRuntimeDataDir() {
+    if (!fs.existsSync(runtimeDataDir)) {
+        fs.mkdirSync(runtimeDataDir, { recursive: true });
+    }
+}
+
+function seedRuntimeFile(targetPath, sourcePath, fallbackContent) {
+    ensureRuntimeDataDir();
+    if (fs.existsSync(targetPath)) return;
+    if (fs.existsSync(sourcePath)) {
+        fs.copyFileSync(sourcePath, targetPath);
+        return;
+    }
+    fs.writeFileSync(targetPath, fallbackContent, 'utf8');
+}
+
 // Local Database Mock implementation for Offline Mode
-const fs = require('fs');
-const DB_FILE = path.join(__dirname, 'local_db.json');
 
 function readLocalDb() {
     if (!fs.existsSync(DB_FILE)) {
@@ -48,7 +68,11 @@ function readLocalDb() {
             ],
             messages: []
         };
-        fs.writeFileSync(DB_FILE, JSON.stringify(defaultDb, null, 2), 'utf8');
+        seedRuntimeFile(
+            DB_FILE,
+            path.join(__dirname, 'local_db.json'),
+            JSON.stringify(defaultDb, null, 2)
+        );
         return defaultDb;
     }
     try {
@@ -221,11 +245,12 @@ const AUTO_WAITING_MESSAGE = 'Admin is currently offline. Please wait, your mess
 let adminLastSeenAt = 0;
 
 // Simple file-based AI permissions store (userId -> boolean)
-const AI_PERMISSIONS_PATH = path.join(__dirname, 'ai_permissions.json');
 function ensureAiPermissionsFile() {
-    if (!fs.existsSync(AI_PERMISSIONS_PATH)) {
-        fs.writeFileSync(AI_PERMISSIONS_PATH, JSON.stringify({}), 'utf8');
-    }
+    seedRuntimeFile(
+        AI_PERMISSIONS_PATH,
+        path.join(__dirname, 'ai_permissions.json'),
+        JSON.stringify({})
+    );
 }
 function readAiPermissions() {
     ensureAiPermissionsFile();
@@ -1055,9 +1080,11 @@ app.delete('/api/admin/chat/delete/:userId', verifyAdminToken, async (req, res) 
 // Dev: revert login page to backup (saves previous state before promo insertion)
 app.post('/api/revert-login', verifyUserToken, async (req, res) => {
     try {
+        if (isVercelRuntime) {
+            return res.status(501).json({ error: 'Revert is disabled on Vercel runtime' });
+        }
         const backupPath = path.join(__dirname, '..', 'frontend', 'login.html.bak');
         const targetPath = path.join(__dirname, '..', 'frontend', 'login.html');
-        const fs = require('fs');
         if (!fs.existsSync(backupPath)) return res.status(404).json({ error: 'Backup not found' });
         const content = fs.readFileSync(backupPath, 'utf8');
         fs.writeFileSync(targetPath, content, 'utf8');
@@ -1073,24 +1100,20 @@ app.get('{*path}', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'frontend', 'login.html'));
 });
 
-const dns = require('dns');
-
-let hostname = '';
-try {
-    hostname = new URL(supabaseUrl).hostname;
-} catch (e) {}
-
-console.log('🔌 Checking database connection...');
-dns.lookup(hostname, (dnsErr) => {
-    if (dnsErr) {
-        console.log('⚠️  Supabase database URL is unreachable (Paused/Deleted/Offline).');
-        console.log('🔄 Falling back to Local JSON Database (local_db.json) for 100% offline functionality!');
-        supabase = createLocalSupabaseMock();
-    } else {
-        console.log('✅ Supabase database is reachable. Connecting to cloud database...');
+function initializeDataBackends() {
+    if (supabaseUrl && supabaseKey) {
+        console.log('✅ Supabase credentials detected. Using cloud database.');
         supabase = createClient(supabaseUrl, supabaseKey);
+        return;
     }
 
+    console.log('⚠️  Supabase credentials missing. Falling back to local JSON database.');
+    supabase = createLocalSupabaseMock();
+}
+
+initializeDataBackends();
+
+function startServer() {
     const PORT = process.env.PORT || 5000;
     const server = app.listen(PORT, () => {
         console.log(`\n🚀 MahaRoute Backend running on http://localhost:${PORT}`);
@@ -1107,4 +1130,10 @@ dns.lookup(hostname, (dnsErr) => {
         console.error('\n❌ Server failed to start:', err);
         process.exit(1);
     });
-});
+}
+
+if (require.main === module) {
+    startServer();
+}
+
+module.exports = app;
